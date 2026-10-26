@@ -7,31 +7,44 @@
 
 #include "scheduler.hpp"
 
-namespace sched {
+namespace sched
+{
 
-class sched_mutex {
-public:
-    // Создаётся в setup() тестовой программы; зарегистрируйте лок в планировщике s.
-    sched_mutex(Scheduler& s, std::string name) : name(std::move(name)) { (void)s; }
-    sched_mutex(const sched_mutex&) = delete;
+    class sched_mutex
+    {
+    public:
+        // Создаётся в setup() тестовой программы; зарегистрируйте лок в планировщике s.
+        sched_mutex(Scheduler &s, std::string name) : name(std::move(name)), s(s) { s.register_lock(this); }
+        sched_mutex(const sched_mutex &) = delete;
 
-    // Пауза; если лок занят — ждать, не участвуя в выборе; затем стать владельцем.
-    void lock() { throw std::logic_error("TODO этап 2: sched_mutex::lock"); }
-    // Пауза; освободить лок, ждавшие потоки снова могут быть выбраны.
-    void unlock() { throw std::logic_error("TODO этап 2: sched_mutex::unlock"); }
+        // Пауза; если лок занят — ждать, не участвуя в выборе; затем стать владельцем.
+        void lock()
+        {
+            s.wait_for_lock(this);
 
-    const std::string name;
-};
+            // throw std::logic_error("TODO этап 2: sched_mutex::lock");
+        }
+        // Пауза; освободить лок, ждавшие потоки снова могут быть выбраны.
+        void unlock()
+        {
+            s.unlock(this);
+        }
 
-// RAII: lock сейчас, unlock на закрывающей скобке. Выдан готовым.
-class sched_guard {
-public:
-    explicit sched_guard(sched_mutex& m) : m_(m) { m_.lock(); }
-    ~sched_guard() noexcept(false) { m_.unlock(); }
-    sched_guard(const sched_guard&) = delete;
+        const std::string name;
+        Scheduler &s;
+        int owner = -1; // Worker id
+    };
 
-private:
-    sched_mutex& m_;
-};
+    // RAII: lock сейчас, unlock на закрывающей скобке. Выдан готовым.
+    class sched_guard
+    {
+    public:
+        explicit sched_guard(sched_mutex &m) : m_(m) { m_.lock(); }
+        ~sched_guard() noexcept(false) { m_.unlock(); }
+        sched_guard(const sched_guard &) = delete;
 
-}  // namespace sched
+    private:
+        sched_mutex &m_;
+    };
+
+} // namespace sched
